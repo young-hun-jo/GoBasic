@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/PuerkitoBio/goquery"
+	ccsv "github.com/tsak/concurrent-csv-writer"
 )
 
 var baseURL string = "https://kr.indeed.com/jobs?q=python"
@@ -32,10 +35,63 @@ func main() {
 		job := <-mainC
 		jobs = append(jobs, job...)
 	}
-	fmt.Println("Finish indeed crawling")
+	// Write CSV
+	// WriteCSV(jobs)
 
+	// Write CSV using go routine
+	NewWriteCSV(jobs)
 }
 
+// write struct in array to csv file using go routine
+func NewWriteCSV(jobs []extractedJob) {
+	csv, err := ccsv.NewCsvWriter("./jobs.csv")
+	checkRequest(err)
+
+	defer csv.Close()
+
+	// csv의 헤더 삽입
+	header := []string{"id", "title", "company", "location", "salary", "summary"}
+	wErr := csv.Write(header)
+	checkRequest(wErr)
+
+	done := make(chan bool)
+	for _, job := range jobs {
+		go func(job extractedJob) {
+			record := []string{"https://kr.indeed.com/jobs?q=python&l&vjk=" + job.id, job.title, job.company, job.location, job.salary, job.summary}
+			csv.Write(record)
+			done <- true
+		}(job)
+	}
+
+	// main으로 데이터 전송
+	for i := 0; i < len(jobs); i++ {
+		fmt.Println("Finish inserting data into csv: ", <-done)
+	}
+}
+
+// write struct in array to csv file
+func WriteCSV(jobs []extractedJob) {
+	file, err := os.Create("./jobs.csv")
+	checkRequest(err)
+
+	csv := csv.NewWriter(file)
+	// 마지막에 Flush 수행해야 실질적으로 파일에 데이터가 입력됨!
+	defer csv.Flush()
+
+	// csv의 헤더 삽입
+	header := []string{"id", "title", "company", "location", "salary", "summary"}
+	wErr := csv.Write(header)
+	checkRequest(wErr)
+
+	// 데이터 csv 파일에 삽입
+	for _, job := range jobs {
+		record := []string{"https://kr.indeed.com/jobs?q=python&l&vjk=" + job.id, job.title, job.company, job.location, job.salary, job.summary}
+		wErr := csv.Write(record)
+		checkRequest(wErr)
+	}
+}
+
+// requesting URL and get information from Indeed using go routine
 func GetPage(page int, mainC chan []extractedJob) {
 	c := make(chan extractedJob)
 	var jobs []extractedJob
@@ -63,6 +119,7 @@ func GetPage(page int, mainC chan []extractedJob) {
 	mainC <- jobs
 }
 
+// get information from Indeed using go routine
 func ExtractJob(card *goquery.Selection, c chan extractedJob) {
 	id, _ := card.Attr("data-jk")
 	title := card.Find(".jobTitle").Text()
