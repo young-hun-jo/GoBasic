@@ -1,6 +1,9 @@
 # csv file
 *.csv
 
+# txt file
+*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
