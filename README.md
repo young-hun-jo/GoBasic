@@ -1,2 +1,4 @@
-# WebScrapping
-Web Scrapping server by Go language
+# GoBasic
+## Go 언어를 활용한 입문 튜토리얼
+- Go를 활용한 병행처리(고루틴) 데이터 스크래핑
+- Go 입문 책
